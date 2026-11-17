@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "agence": {
-      "command": "npx",
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
       "args": [
         "-y",
         "mcp-remote@0.16.6",
@@ -10,7 +10,8 @@
         "Authorization:${AUTH_HEADER}"
       ],
       "env": {
-        "AUTH_HEADER": "Bearer jeton-agence-2026-a-remplacer"
+        "AUTH_HEADER": "Bearer jeton-agence-2026-a-remplacer",
+        "PATH": "C:\\Program Files\\nodejs;C:\\Windows\\System32;C:\\Windows"
       }
     }
   }
