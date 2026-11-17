@@ -1,0 +1,340 @@
+{
+  "name": "30 · Jour 4 · agent publié (avant durcissement)",
+  "nodes": [
+    {
+      "id": "n301",
+      "name": "Message client",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agent",
+        "responseMode": "responseNode",
+        "authentication": "none",
+        "options": {}
+      },
+      "webhookId": "agent"
+    },
+    {
+      "id": "n302",
+      "name": "Lire les préférences",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT coalesce(string_agg('- ' || cle || ' : ' || valeur, E'\\n' ORDER BY cle), 'aucune') AS preferences\nFROM preferences\nWHERE client_email = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.expediteur }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n303",
+      "name": "Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=De : {{ $('Message client').item.json.body.expediteur }}\n\n{{ $('Message client').item.json.body.texte }}",
+        "options": {
+          "systemMessage": "=Tu es l'assistant de l'agence de voyages.\nTu disposes de la mémoire des échanges avec ce client.\n\nPréférences connues du client :\n{{ $json.preferences }}\n\nOutils : chercher_dossier pour consulter un dossier, retenir_preference pour une préférence durable (clés : aeroport_depart, hebergement, budget_max, siege, rythme), accorder_geste pour un geste commercial (200 € maximum, soumis à l'approbation du responsable).\nRéponds en deux phrases maximum.",
+          "maxIterations": 6,
+          "returnIntermediateSteps": true
+        }
+      }
+    },
+    {
+      "id": "n304",
+      "name": "Claude",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        260,
+        260
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic (clé du parcours)"
+        }
+      }
+    },
+    {
+      "id": "n305",
+      "name": "Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.4,
+      "position": [
+        400,
+        260
+      ],
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Message client').item.json.body.expediteur }}",
+        "contextWindowLength": 10
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n306",
+      "name": "chercher_dossier",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        540,
+        260
+      ],
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Retrouve le dossier de voyage d'un client à partir de son adresse e-mail. Entrée : email. Sortie : destination, date de départ, nombre de personnes, statut.",
+        "operation": "executeQuery",
+        "query": "SELECT destination, date_depart, nb_personnes, statut\nFROM dossiers\nWHERE client_email = $1;",
+        "options": {
+          "queryReplacement": "={{ $fromAI('email', \"Adresse e-mail du client\", 'string') }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n307",
+      "name": "retenir_preference",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        680,
+        260
+      ],
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Enregistre ou met à jour une préférence de voyage durable du client. Entrée : cle (une des clés autorisées) et valeur (texte court). Sortie : la préférence enregistrée.",
+        "operation": "executeQuery",
+        "query": "INSERT INTO preferences (client_email, cle, valeur)\nVALUES ($1, $2, $3)\nON CONFLICT (client_email, cle)\nDO UPDATE SET valeur = EXCLUDED.valeur, maj_le = now()\nRETURNING cle, valeur;",
+        "options": {
+          "queryReplacement": "={{ $('Message client').item.json.body.expediteur }}, {{ $fromAI('cle', \"Clé autorisée : aeroport_depart, hebergement, budget_max, siege ou rythme\", 'string') }}, {{ $fromAI('valeur', \"Valeur courte de la préférence\", 'string') }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n308",
+      "name": "Approbation du responsable",
+      "type": "n8n-nodes-base.emailSendHitlTool",
+      "typeVersion": 2.1,
+      "position": [
+        820,
+        260
+      ],
+      "parameters": {
+        "fromEmail": "agent@agence.test",
+        "toEmail": "responsable@agence.test",
+        "subject": "=Approbation demandée : {{ $tool.name }}",
+        "message": "=L'agent de l'agence demande à exécuter : {{ $tool.name }}\n\nParamètres :\n{{ JSON.stringify($tool.parameters, null, 2) }}\n\nApprouvez seulement si le geste est justifié.",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Approuver",
+            "disapproveLabel": "Refuser"
+          }
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "Boîte de test (SMTP)"
+        }
+      },
+      "webhookId": "def4293e-efcd-4f69-9868-c4938c4e4e84"
+    },
+    {
+      "id": "n309",
+      "name": "accorder_geste",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        820,
+        460
+      ],
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Accorde un geste commercial à un client (avoir sur un prochain voyage). Entrée : email, montant en euros (200 maximum), motif. Sortie : le geste enregistré.",
+        "operation": "executeQuery",
+        "query": "INSERT INTO gestes (client_email, montant, motif)\nVALUES ($1, $2, $3)\nRETURNING id, montant, motif;",
+        "options": {
+          "queryReplacement": "={{ $fromAI('email', \"Adresse e-mail du client\", 'string') }}, {{ $fromAI('montant', \"Montant en euros\", 'number') }}, {{ $fromAI('motif', \"Motif court du geste\", 'string') }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n310",
+      "name": "Répondre",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        760,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"reponse\": $json.output } }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Message client": {
+      "main": [
+        [
+          {
+            "node": "Lire les préférences",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire les préférences": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent": {
+      "main": [
+        [
+          {
+            "node": "Répondre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chercher_dossier": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "retenir_preference": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approbation du responsable": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "accorder_geste": {
+      "ai_tool": [
+        [
+          {
+            "node": "Approbation du responsable",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

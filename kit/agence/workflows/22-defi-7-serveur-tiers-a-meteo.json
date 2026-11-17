@@ -1,0 +1,60 @@
+{
+  "name": "22 · Défi 7 · serveur tiers A (météo)",
+  "nodes": [
+    {
+      "id": "n210",
+      "name": "Serveur MCP météo",
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "authentication": "bearerAuth",
+        "path": "tiers-meteo"
+      },
+      "webhookId": "mcp-tiers-meteo",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "",
+          "name": "Jeton serveur météo"
+        }
+      }
+    },
+    {
+      "id": "n211",
+      "name": "meteo_destination",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        240
+      ],
+      "parameters": {
+        "description": "Renvoie les prévisions météo sur 3 jours pour une ville. Entrée : ville. Sortie : texte court. Ne lit ni n'écrit aucune donnée de l'agence.",
+        "language": "javaScript",
+        "jsCode": "// Données de démonstration : aucune connexion extérieure.\nconst previsions = {\n  lisbonne: 'Ensoleillé, 22 °C, 21 °C, 19 °C',\n  cracovie: 'Nuageux, 9 °C, 7 °C, averses',\n  seville: 'Ensoleillé, 26 °C, 27 °C, 25 °C',\n};\nconst v = (query.ville || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\nreturn previsions[v] || 'Ville inconnue du service météo.';",
+        "specifyInputSchema": true,
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{\n  \"ville\": \"Lisbonne\"\n}"
+      }
+    }
+  ],
+  "connections": {
+    "meteo_destination": {
+      "ai_tool": [
+        [
+          {
+            "node": "Serveur MCP météo",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
