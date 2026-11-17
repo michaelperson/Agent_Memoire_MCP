@@ -234,7 +234,8 @@ Send-MailMessage -SmtpServer localhost -Port 3025 `
 | SMTP de test | `localhost:3025` (depuis n8n : `mail:3025`) |
 | IMAP de test | `localhost:3143` (depuis n8n : `mail:3143`) |
 | PostgreSQL | non publié : `docker compose exec postgres psql -U agence -d agence` |
-| Config Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Config Claude Desktop | à ouvrir par **Paramètres > Développeur > Modifier la configuration** ; installateur classique : `%APPDATA%\Claude\claude_desktop_config.json` ; version Microsoft Store : `%LOCALAPPDATA%\Claude-Data\claude_<identifiant>\claude_desktop_config.json` |
+| Journaux MCP de Claude Desktop | version Microsoft Store : `%LOCALAPPDATA%\Claude\Logs\mcp-server-agence.log` ; sinon `%APPDATA%\Claude\logs` (bouton « Afficher les journaux » dans Paramètres > Développeur) |
 
 Jour 4 : ajoutez `WEBHOOK_URL=http://<votre IP>:5678/` dans `.env` (voir `j4/reseau.env.exemple`), puis `docker compose up -d`.
 
@@ -275,6 +276,8 @@ Le dossier `comprendre/` contient quatre animations pas à pas, avec des choix q
 | Postgres Chat Memory : « permission denied for schema public » | compte limité sans droit CREATE | la mémoire garde le compte `agence` |
 | Le voisin ne joint pas votre n8n | pare-feu, mauvaise carte réseau, Wi-Fi isolé | `Tester-Poste`, règle de pare-feu sur le port 5678 (administrateur) |
 | Accents cassés dans un script PowerShell | fichier sans BOM sous PowerShell 5.1 | enregistrer en UTF-8 avec BOM |
+| Claude Desktop : « Impossible de démarrer le connecteur agence », journal « Install for http://localhost:5678/mcp/agence failed » | un ancien `npx` (npm 6, par exemple un paquet `npx` global dans `%APPDATA%\npm`) est trouvé en premier | `command` = chemin complet `C:\\Program Files\\nodejs\\npx.cmd` (déjà dans le modèle du kit) |
+| Claude Desktop : journal « SyntaxError: Unexpected token import » | mcp-remote lancé par un vieux Node (nvm) placé avant dans le PATH | bloc `env` : `PATH` = `C:\\Program Files\\nodejs;C:\\Windows\\System32;C:\\Windows` (déjà dans le modèle du kit) |
 
 ---
 
@@ -301,7 +304,7 @@ Le dossier `comprendre/` contient quatre animations pas à pas, avec des choix q
 ### À vérifier avant la session
 
 - [ ] La clé Anthropic du parcours est active et son plafond de dépense convient.
-- [ ] La configuration Claude Desktop et `mcp-remote` est testée sur le poste formateur : elle n'a pas pu l'être sur la machine de préparation.
+- [ ] La configuration Claude Desktop et `mcp-remote` est testée sur les postes de la salle. Elle a été validée le 17/11/2026 avec Claude Desktop 5.11492 (version Microsoft Store) : c'est le modèle `claude-desktop/claude_desktop_config.json` du kit.
 - [ ] Les postes de la salle se joignent sur le port 5678 (jour 4 et bonus du défi 6).
 - [ ] L'image n8n est toujours en 2.47.x, et la version de la spécification MCP annoncée n'a pas changé.
 - [ ] Les réponses du vrai modèle sont vérifiées sur les corrigés de l'agent C (défi 2) et du jour 4 : le simulateur, lui, obéit toujours.
