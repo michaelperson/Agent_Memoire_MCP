@@ -1,0 +1,256 @@
+{
+  "name": "04 · Défi 1 · bonus (relances)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "n019",
+      "name": "Toutes les heures",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT d.id, d.client_email, d.destination, d.maj_le\nFROM dossiers d\nWHERE d.statut = 'en_attente'\n  AND d.maj_le < now() - interval '48 hours';",
+        "options": {}
+      },
+      "id": "n020",
+      "name": "Dossiers en attente",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n021",
+      "name": "Il y en a ?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Client : {{ $json.client_email }}\nDossier : {{ $json.destination }}, en attente depuis le {{ $json.maj_le }}",
+        "options": {
+          "systemMessage": "Rédige une relance courte et aimable pour un dossier de voyage en attente, puis enregistre-la avec enregistrer_brouillon.",
+          "maxIterations": 3,
+          "returnIntermediateSteps": true
+        }
+      },
+      "id": "n022",
+      "name": "Rédiger la relance",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "n023",
+      "name": "Claude",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        656,
+        240
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic (clé du parcours)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Enregistre un brouillon de relance, sans l'envoyer. Entrée : destinataire, objet, texte.",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "brouillons",
+          "cachedResultName": "brouillons"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "destinataire": "={{ $fromAI('destinataire', \"Adresse e-mail du client\", 'string') }}",
+            "objet": "={{ $fromAI('objet', \"Objet de la relance\", 'string') }}",
+            "texte": "={{ $fromAI('texte', \"Texte de la relance\", 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "destinataire",
+              "displayName": "destinataire",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "objet",
+              "displayName": "objet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "texte",
+              "displayName": "texte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n024",
+      "name": "enregistrer_brouillon",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        816,
+        240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Toutes les heures": {
+      "main": [
+        [
+          {
+            "node": "Dossiers en attente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dossiers en attente": {
+      "main": [
+        [
+          {
+            "node": "Il y en a ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Il y en a ?": {
+      "main": [
+        [
+          {
+            "node": "Rédiger la relance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Rédiger la relance",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enregistrer_brouillon": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rédiger la relance",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

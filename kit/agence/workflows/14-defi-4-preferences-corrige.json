@@ -1,0 +1,223 @@
+{
+  "name": "14 · Défi 4 · préférences (corrigé)",
+  "nodes": [
+    {
+      "id": "n121",
+      "name": "Message client",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "defi4",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "defi4"
+    },
+    {
+      "id": "n122",
+      "name": "Lire les préférences",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT coalesce(string_agg('- ' || cle || ' : ' || valeur, E'\\n' ORDER BY cle), 'aucune') AS preferences\nFROM preferences\nWHERE client_email = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.expediteur }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n123",
+      "name": "Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Message client').item.json.body.texte }}",
+        "options": {
+          "systemMessage": "=Tu es l'assistant de l'agence de voyages.\nTu disposes de la mémoire des échanges avec ce client.\n\nPréférences connues du client :\n{{ $json.preferences }}\n\nQuand le client exprime une préférence de voyage durable, enregistre-la avec retenir_preference.\nClés autorisées : aeroport_depart, hebergement, budget_max, siege, rythme.\nN'enregistre jamais de donnée de santé, de religion, de régime alimentaire, ni de remise ou de tarif.\nRéponds en deux phrases maximum.",
+          "maxIterations": 5,
+          "returnIntermediateSteps": true
+        }
+      }
+    },
+    {
+      "id": "n124",
+      "name": "Claude",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        300,
+        240
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic (clé du parcours)"
+        }
+      }
+    },
+    {
+      "id": "n125",
+      "name": "Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.4,
+      "position": [
+        440,
+        240
+      ],
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Message client').item.json.body.expediteur }}",
+        "contextWindowLength": 10
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n126",
+      "name": "retenir_preference",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        600,
+        240
+      ],
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Enregistre ou met à jour une préférence de voyage durable du client. Entrée : cle (une des clés autorisées) et valeur (texte court). Sortie : la préférence enregistrée.",
+        "operation": "executeQuery",
+        "query": "INSERT INTO preferences (client_email, cle, valeur)\nVALUES ($1, $2, $3)\nON CONFLICT (client_email, cle)\nDO UPDATE SET valeur = EXCLUDED.valeur, maj_le = now()\nRETURNING cle, valeur;",
+        "options": {
+          "queryReplacement": "={{ $('Message client').item.json.body.expediteur }}, {{ $fromAI('cle', \"Clé autorisée : aeroport_depart, hebergement, budget_max, siege ou rythme\", 'string') }}, {{ $fromAI('valeur', \"Valeur courte de la préférence\", 'string') }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n127",
+      "name": "Répondre",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"reponse\": $json.output } }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Message client": {
+      "main": [
+        [
+          {
+            "node": "Lire les préférences",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire les préférences": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent": {
+      "main": [
+        [
+          {
+            "node": "Répondre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "retenir_preference": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

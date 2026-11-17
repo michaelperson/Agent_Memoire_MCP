@@ -1,0 +1,139 @@
+{
+  "name": "20 · Défi 6 · serveur MCP de l'agence",
+  "nodes": [
+    {
+      "id": "n201",
+      "name": "Serveur MCP agence",
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "authentication": "bearerAuth",
+        "path": "agence"
+      },
+      "webhookId": "mcp-agence",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "",
+          "name": "Jeton MCP agence"
+        }
+      }
+    },
+    {
+      "id": "n202",
+      "name": "chercher_dossier",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        -180,
+        240
+      ],
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Retrouve le dossier de voyage d'un client à partir de son adresse e-mail. Entrée : email. Sortie : destination, date de départ, nombre de personnes et statut, ou une liste vide.",
+        "operation": "executeQuery",
+        "query": "SELECT destination, date_depart, nb_personnes, statut\nFROM dossiers\nWHERE client_email = $1;",
+        "options": {
+          "queryReplacement": "={{ $fromAI('email', \"Adresse e-mail du client\", 'string') }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n203",
+      "name": "lire_preferences",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        240
+      ],
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Lit la fiche de préférences de voyage d'un client (aéroport, logement, budget…). Entrée : email. Sortie : liste clé / valeur, vide si le client n'a pas de fiche.",
+        "operation": "executeQuery",
+        "query": "SELECT cle, valeur\nFROM preferences\nWHERE client_email = $1\nORDER BY cle;",
+        "options": {
+          "queryReplacement": "={{ $fromAI('email', \"Adresse e-mail du client\", 'string') }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n204",
+      "name": "enregistrer_demande",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        180,
+        240
+      ],
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Enregistre une nouvelle demande de client pour qu'un conseiller la traite. Entrée : expediteur (e-mail), objet, texte. Sortie : numéro de la demande. N'envoie rien au client.",
+        "operation": "executeQuery",
+        "query": "INSERT INTO demandes (expediteur, objet, texte, categorie)\nVALUES ($1, $2, $3, 'mcp')\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $fromAI('expediteur', \"Adresse e-mail du client\", 'string') }}, {{ $fromAI('objet', \"Objet court de la demande\", 'string') }}, {{ $fromAI('texte', \"Texte de la demande\", 'string') }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "chercher_dossier": {
+      "ai_tool": [
+        [
+          {
+            "node": "Serveur MCP agence",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lire_preferences": {
+      "ai_tool": [
+        [
+          {
+            "node": "Serveur MCP agence",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enregistrer_demande": {
+      "ai_tool": [
+        [
+          {
+            "node": "Serveur MCP agence",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

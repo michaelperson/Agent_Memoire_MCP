@@ -1,0 +1,8 @@
+# Jour 4 (durcissement) : à copier à côté de docker-compose.yml, puis « docker compose up -d ».
+# Docker Compose lit ce fichier automatiquement et il remplace les ports de la messagerie de test :
+# elle n'est plus joignable que depuis votre poste (127.0.0.1), plus depuis le réseau.
+services:
+  mail:
+    ports: !override
+      - "127.0.0.1:3025:3025"
+      - "127.0.0.1:3143:3143"

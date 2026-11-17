@@ -1,0 +1,347 @@
+{
+  "name": "01 · Démo e-mail",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "forceReconnect": 1,
+          "trackLastMessageId": false
+        }
+      },
+      "id": "n006",
+      "name": "Nouvel e-mail",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "imap": {
+          "id": "",
+          "name": "Boîte de test (IMAP)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "expediteur",
+              "type": "string",
+              "value": "={{ $json.from.match(/[\\w.+-]+@[\\w.-]+/)[0] }}"
+            },
+            {
+              "id": "a2",
+              "name": "objet",
+              "type": "string",
+              "value": "={{ $json.subject }}"
+            },
+            {
+              "id": "a3",
+              "name": "texte",
+              "type": "string",
+              "value": "={{ $json.textPlain }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n007",
+      "name": "Préparer",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Expéditeur : {{ $json.expediteur }}\nObjet : {{ $json.objet }}\n\n{{ $json.texte }}",
+        "options": {
+          "systemMessage": "Tu es l'assistant de tri d'une agence de voyages.\nPour chaque e-mail reçu :\n1. Cherche le dossier du client avec l'outil chercher_dossier (adresse de l'expéditeur).\n2. Rédige un brouillon de réponse courte et polie, puis enregistre-le avec enregistrer_brouillon.\n3. Termine par une phrase qui résume ce que tu as fait. N'envoie jamais rien toi-même.",
+          "maxIterations": 5,
+          "returnIntermediateSteps": true
+        }
+      },
+      "id": "n008",
+      "name": "Agent de tri",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        464,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "n009",
+      "name": "Claude",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        400,
+        240
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic (clé du parcours)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Retrouve le dossier d'un client à partir de son adresse e-mail. À utiliser avant toute réponse sur une réservation. Entrée : email (texte). Sortie : destination, date de départ, nombre de personnes et statut, ou une liste vide si aucun dossier.",
+        "operation": "executeQuery",
+        "query": "SELECT destination, date_depart, nb_personnes, statut\nFROM dossiers\nWHERE client_email = $1;",
+        "options": {
+          "queryReplacement": "={{ $fromAI('email', \"Adresse e-mail du client\", 'string') }}"
+        }
+      },
+      "id": "n010",
+      "name": "chercher_dossier",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        560,
+        240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Enregistre un brouillon de réponse, sans l'envoyer. Entrée : destinataire, objet, texte. À appeler une seule fois, après chercher_dossier.",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "brouillons",
+          "cachedResultName": "brouillons"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "destinataire": "={{ $fromAI('destinataire', \"Adresse e-mail du client\", 'string') }}",
+            "objet": "={{ $fromAI('objet', \"Objet de la réponse\", 'string') }}",
+            "texte": "={{ $fromAI('texte', \"Texte complet du brouillon\", 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "destinataire",
+              "displayName": "destinataire",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "objet",
+              "displayName": "objet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "texte",
+              "displayName": "texte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n011",
+      "name": "enregistrer_brouillon",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        720,
+        240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "journal",
+          "cachedResultName": "journal"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow": "01 · Démo e-mail",
+            "action": "tri",
+            "detail": "={{ $json.output }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n012",
+      "name": "Écrire au journal",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        816,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Nouvel e-mail": {
+      "main": [
+        [
+          {
+            "node": "Préparer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer": {
+      "main": [
+        [
+          {
+            "node": "Agent de tri",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent de tri": {
+      "main": [
+        [
+          {
+            "node": "Écrire au journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent de tri",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chercher_dossier": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent de tri",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enregistrer_brouillon": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent de tri",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,254 @@
+{
+  "name": "25 · Défi 8 · geste avec approbation (corrigé)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "defi8",
+        "options": {}
+      },
+      "id": "n217",
+      "name": "Réclamation",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "defi8"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=De : {{ $json.body.expediteur }}\n\n{{ $json.body.texte }}",
+        "options": {
+          "systemMessage": "Tu es l'assistant de l'agence de voyages.\nQuand un client a subi un désagrément, tu peux proposer un geste commercial avec accorder_geste (200 € maximum).\nChaque geste est soumis à l'approbation du responsable : n'annonce jamais un geste avant sa validation.\nRéponds en deux phrases maximum.",
+          "maxIterations": 5,
+          "returnIntermediateSteps": true
+        }
+      },
+      "id": "n218",
+      "name": "Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        256,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "n219",
+      "name": "Claude",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        144,
+        240
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic (clé du parcours)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "message": "=L'agent de l'agence demande à exécuter : {{ $tool.name }}\n\nParamètres :\n{{ JSON.stringify($tool.parameters, null, 2) }}\n\nApprouvez seulement si le geste est justifié.",
+        "fromEmail": "agent@agence.test",
+        "toEmail": "responsable@agence.test",
+        "subject": "=Approbation demandée : {{ $tool.name }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Approuver",
+            "disapproveLabel": "Refuser"
+          }
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "n220",
+      "name": "Approbation du responsable",
+      "type": "n8n-nodes-base.emailSendHitlTool",
+      "typeVersion": 2.1,
+      "position": [
+        368,
+        240
+      ],
+      "webhookId": "2d671ac3-f719-42e1-b5b9-68eed288e839",
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "Boîte de test (SMTP)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Accorde un geste commercial à un client (avoir sur un prochain voyage). Entrée : email, montant en euros (200 maximum), motif. Sortie : le geste enregistré.",
+        "operation": "executeQuery",
+        "query": "INSERT INTO gestes (client_email, montant, motif)\nVALUES ($1, $2, $3)\nRETURNING id, montant, motif;",
+        "options": {
+          "queryReplacement": "={{ $fromAI('email', \"Adresse e-mail du client\", 'string') }}, {{ $fromAI('montant', \"Montant en euros\", 'number') }}, {{ $fromAI('motif', \"Motif court du geste\", 'string') }}"
+        }
+      },
+      "id": "n221",
+      "name": "accorder_geste",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        368,
+        448
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "journal",
+          "cachedResultName": "journal"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow": "25 · Défi 8 · geste avec approbation (corrigé)",
+            "action": "geste",
+            "detail": "={{ $json.output }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n222",
+      "name": "Écrire au journal",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        560,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Réclamation": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent": {
+      "main": [
+        [
+          {
+            "node": "Écrire au journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approbation du responsable": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "accorder_geste": {
+      "ai_tool": [
+        [
+          {
+            "node": "Approbation du responsable",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

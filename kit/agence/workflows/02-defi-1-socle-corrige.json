@@ -1,0 +1,257 @@
+{
+  "name": "02 · Défi 1 · socle (corrigé)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "demande",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "n013",
+      "name": "Nouvelle demande",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "demande-agence"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=De : {{ $json.body.expediteur }}\nObjet : {{ $json.body.objet }}\n\n{{ $json.body.texte }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Tu classes les demandes reçues par une agence de voyages.\nCatégories : devis, reclamation, info, autre.\nUrgence : 1 (faible) à 3 (forte, départ proche ou client mécontent).\nRésumé : une phrase de 12 mots maximum.",
+          "maxIterations": 3,
+          "returnIntermediateSteps": true
+        }
+      },
+      "id": "n014",
+      "name": "Classer la demande",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "n015",
+      "name": "Claude",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        176,
+        240
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic (clé du parcours)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"categorie\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"devis\",\n        \"reclamation\",\n        \"info\",\n        \"autre\"\n      ]\n    },\n    \"urgence\": {\n      \"type\": \"integer\",\n      \"minimum\": 1,\n      \"maximum\": 3\n    },\n    \"resume\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"categorie\",\n    \"urgence\",\n    \"resume\"\n  ]\n}"
+      },
+      "id": "n016",
+      "name": "Format de sortie",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        336,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "demandes",
+          "cachedResultName": "demandes"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "expediteur": "={{ $('Nouvelle demande').item.json.body.expediteur }}",
+            "objet": "={{ $('Nouvelle demande').item.json.body.objet }}",
+            "texte": "={{ $('Nouvelle demande').item.json.body.texte }}",
+            "categorie": "={{ $json.output.categorie }}",
+            "urgence": "={{ $json.output.urgence }}",
+            "resume": "={{ $json.output.resume }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "expediteur",
+              "displayName": "expediteur",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "objet",
+              "displayName": "objet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "texte",
+              "displayName": "texte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "categorie",
+              "displayName": "categorie",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgence",
+              "displayName": "urgence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resume",
+              "displayName": "resume",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n017",
+      "name": "Enregistrer la demande",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        528,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"id\": $json.id, \"categorie\": $json.categorie, \"urgence\": $json.urgence } }}",
+        "options": {}
+      },
+      "id": "n018",
+      "name": "Répondre",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        768,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Nouvelle demande": {
+      "main": [
+        [
+          {
+            "node": "Classer la demande",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classer la demande": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer la demande",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enregistrer la demande": {
+      "main": [
+        [
+          {
+            "node": "Répondre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classer la demande",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format de sortie": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Classer la demande",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "agence": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@0.16.6",
+        "http://localhost:5678/mcp/agence",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer jeton-agence-2026-a-remplacer"
+      }
+    }
+  }
+}

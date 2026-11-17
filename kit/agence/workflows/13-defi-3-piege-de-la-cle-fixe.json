@@ -1,0 +1,189 @@
+{
+  "name": "13 · Défi 3 · piège de la clé fixe",
+  "nodes": [
+    {
+      "id": "n115",
+      "name": "Message client",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "defi3-piege",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "defi3-piege"
+    },
+    {
+      "id": "n116",
+      "name": "Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=De : {{ $json.body.expediteur }}\n\n{{ $json.body.texte }}",
+        "options": {
+          "systemMessage": "Tu es l'assistant de l'agence de voyages. Tu réponds aux messages des clients.\nTu disposes de la mémoire des échanges précédents avec ce client : appuie-toi dessus.\nPour une question sur une réservation, cherche le dossier avec chercher_dossier.\nRéponds en deux phrases maximum.",
+          "maxIterations": 5,
+          "returnIntermediateSteps": true
+        }
+      }
+    },
+    {
+      "id": "n117",
+      "name": "Claude",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        140,
+        240
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic (clé du parcours)"
+        }
+      }
+    },
+    {
+      "id": "n118",
+      "name": "Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.4,
+      "position": [
+        300,
+        240
+      ],
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "agence",
+        "contextWindowLength": 10
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n119",
+      "name": "chercher_dossier",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        460,
+        240
+      ],
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Retrouve le dossier d'un client à partir de son adresse e-mail. Entrée : email (texte). Sortie : destination, date de départ, nombre de personnes et statut, ou une liste vide.",
+        "operation": "executeQuery",
+        "query": "SELECT destination, date_depart, nb_personnes, statut\nFROM dossiers\nWHERE client_email = $1;",
+        "options": {
+          "queryReplacement": "={{ $fromAI('email', \"Adresse e-mail du client\", 'string') }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n120",
+      "name": "Répondre",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        620,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"reponse\": $json.output } }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Message client": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent": {
+      "main": [
+        [
+          {
+            "node": "Répondre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chercher_dossier": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

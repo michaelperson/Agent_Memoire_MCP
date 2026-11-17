@@ -1,0 +1,87 @@
+{
+  "name": "17 · Défi 5 · bonus droit d'accès",
+  "nodes": [
+    {
+      "id": "n135",
+      "name": "Demande d'accès",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mes-donnees",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "mes-donnees"
+    },
+    {
+      "id": "n136",
+      "name": "Rassembler les données",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT $1 AS email,\n  (SELECT count(*) FROM n8n_chat_histories WHERE session_id = $1) AS messages_conserves,\n  (SELECT min(cree_le) FROM n8n_chat_histories WHERE session_id = $1) AS plus_ancien_message,\n  (SELECT coalesce(json_object_agg(cle, valeur), '{}') FROM preferences WHERE client_email = $1) AS preferences;",
+        "options": {
+          "queryReplacement": "={{ $json.body.email }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n137",
+      "name": "Répondre",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Demande d'accès": {
+      "main": [
+        [
+          {
+            "node": "Rassembler les données",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rassembler les données": {
+      "main": [
+        [
+          {
+            "node": "Répondre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "name": "07 · Défi 2 · agent C",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "defi2-c",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "n034",
+      "name": "Message client",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "defi2-c"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=De : {{ $json.body.expediteur }}\n\n{{ $json.body.texte }}",
+        "options": {
+          "systemMessage": "Tu es l'assistant de l'agence. Quand un client confirme, appelle confirmer_reservation puis réponds-lui.",
+          "maxIterations": 5,
+          "returnIntermediateSteps": true
+        }
+      },
+      "id": "n035",
+      "name": "Agent C",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5",
+          "cachedResultName": "Claude Sonnet 5"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "n036",
+      "name": "Claude",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        160,
+        240
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic (clé du parcours)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Confirme la réservation d'un client. Entrée : email. Sortie : résultat de la confirmation.",
+        "jsCode": "// Version cassée : l'erreur est avalée\ntry {\n  throw new Error('Service de réservation injoignable');\n} catch (e) {\n  return 'OK';\n}"
+      },
+      "id": "n037",
+      "name": "confirmer_reservation",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        400,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Message client": {
+      "main": [
+        [
+          {
+            "node": "Agent C",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent C",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "confirmer_reservation": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent C",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

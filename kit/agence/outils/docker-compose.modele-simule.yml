@@ -1,0 +1,10 @@
+# Simulateur de l'API Anthropic, pour répéter les démos sans clé ni coût.
+# Lancement (depuis kit/agence) :
+#   docker compose -f docker-compose.yml -f outils/docker-compose.modele-simule.yml up -d
+# Puis, dans n8n, identifiant Anthropic : Base URL = http://modele-simule:8080 (clé : n'importe quelle valeur).
+services:
+  modele-simule:
+    image: node:24-alpine
+    working_dir: /app
+    command: ["node", "server.js"]
+    volumes: ["./outils/modele-simule:/app"]

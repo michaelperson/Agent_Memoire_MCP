@@ -1,0 +1,142 @@
+{
+  "name": "15 · Défi 5 · purge planifiée",
+  "nodes": [
+    {
+      "id": "n128",
+      "name": "Chaque nuit à 3 h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n129",
+      "name": "Purger la mémoire",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH m AS (\n  DELETE FROM n8n_chat_histories\n  WHERE cree_le < now() - interval '30 days'\n  RETURNING 1\n), p AS (\n  DELETE FROM preferences\n  WHERE maj_le < now() - interval '24 months'\n  RETURNING 1\n)\nSELECT (SELECT count(*) FROM m) AS messages,\n       (SELECT count(*) FROM p) AS preferences;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n130",
+      "name": "Écrire au journal",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "journal",
+          "cachedResultName": "journal"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow": "15 · Défi 5 · purge planifiée",
+            "action": "purge",
+            "detail": "={{ $json.messages }} message(s), {{ $json.preferences }} préférence(s) supprimé(s)"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chaque nuit à 3 h": {
+      "main": [
+        [
+          {
+            "node": "Purger la mémoire",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Purger la mémoire": {
+      "main": [
+        [
+          {
+            "node": "Écrire au journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

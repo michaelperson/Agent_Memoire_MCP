@@ -1,0 +1,167 @@
+{
+  "name": "16 · Défi 5 · oublie-moi",
+  "nodes": [
+    {
+      "id": "n131",
+      "name": "Demande d'effacement",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "oublie-moi",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "oublie-moi"
+    },
+    {
+      "id": "n132",
+      "name": "Effacer la mémoire du client",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH m AS (\n  DELETE FROM n8n_chat_histories WHERE session_id = $1 RETURNING 1\n), p AS (\n  DELETE FROM preferences WHERE client_email = $1 RETURNING 1\n)\nSELECT (SELECT count(*) FROM m) AS messages,\n       (SELECT count(*) FROM p) AS preferences;",
+        "options": {
+          "queryReplacement": "={{ $json.body.email }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n133",
+      "name": "Écrire au journal",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "journal",
+          "cachedResultName": "journal"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow": "16 · Défi 5 · oublie-moi",
+            "action": "effacement",
+            "detail": "=Demande traitée : {{ $json.messages }} message(s), {{ $json.preferences }} préférence(s)"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "displayName": "detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PostgreSQL agence"
+        }
+      }
+    },
+    {
+      "id": "n134",
+      "name": "Répondre",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"messages_effaces\": $('Effacer la mémoire du client').item.json.messages, \"preferences_effacees\": $('Effacer la mémoire du client').item.json.preferences } }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Demande d'effacement": {
+      "main": [
+        [
+          {
+            "node": "Effacer la mémoire du client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Effacer la mémoire du client": {
+      "main": [
+        [
+          {
+            "node": "Écrire au journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire au journal": {
+      "main": [
+        [
+          {
+            "node": "Répondre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
